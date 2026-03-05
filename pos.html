@@ -26,37 +26,9 @@
         .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         
-        /* Receipt Print Area (Hidden on screen) */
+        /* Receipt Print Area (Hidden entirely from main view) */
         #receipt-print-area {
-            position: fixed; top: -9999px; left: 0; z-index: -100;
-            width: 58mm; background: white; color: black; padding: 0; margin: 0;
-            font-family: 'Inter', sans-serif; 
-        }
-
-        /* 🖨️ Thermal Print Formatting */
-        @media print {
-            @page { 
-                margin: 0; 
-                size: 58mm auto; 
-            }
-            body { 
-                margin: 0 !important; 
-                background: white !important; 
-                -webkit-print-color-adjust: exact;
-            }
-            /* Hide the entire app UI */
-            body > *:not(#receipt-print-area) {
-                display: none !important;
-            }
-            /* Show ONLY the receipt formatted for thermal printers */
-            #receipt-print-area {
-                display: block !important;
-                position: static !important;
-                width: 58mm !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                z-index: 99999 !important;
-            }
+            display: none;
         }
 
         .fade-in { animation: fadeIn 0.3s ease-out forwards; }
@@ -269,7 +241,7 @@
             </div>
         </div>
 
-        <!-- RIGHT COLUMN: Checkout Panel (FIXED SCROLLING & MAX HEIGHT) -->
+        <!-- RIGHT COLUMN: Checkout Panel -->
         <div class="w-full lg:w-[400px] bg-white rounded-2xl shadow-xl border border-slate-200 lg:sticky lg:top-[88px] lg:max-h-[calc(100vh-110px)] overflow-hidden flex flex-col shrink-0">
             
             <div class="p-6 bg-white border-b border-slate-100 shrink-0">
@@ -379,7 +351,7 @@
         </div>
     </div>
 
-    <!-- === BILL PREVIEW / SUCCESS MODAL (FIXED SCROLLING) === -->
+    <!-- === BILL PREVIEW / SUCCESS MODAL === -->
     <div id="preview-modal" class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm hidden fade-in p-4 sm:p-6">
         <div class="flex flex-col items-center gap-4 w-full max-w-sm max-h-[90vh]">
             
@@ -400,7 +372,7 @@
         </div>
     </div>
 
-    <!-- === HIDDEN RECEIPT CONTAINER (For Direct Printing) === -->
+    <!-- === HIDDEN RECEIPT CONTAINER (For JS Storage) === -->
     <div id="receipt-print-area"></div>
 
     <!-- === JAVASCRIPT LOGIC === -->
@@ -693,7 +665,7 @@
             return { subtotal, discount, netPayable, received, balance };
         };
 
-        // --- PREVIEW & PRINT LOGIC ---
+        // --- PREVIEW LOGIC ---
         window.previewBill = (isPostSale = false) => {
              if (!isPostSale && cart.length === 0) return alert("Cart is empty");
              
@@ -838,9 +810,9 @@
                 document.getElementById('loading-overlay').classList.add('hidden');
                 document.getElementById('preview-modal').classList.remove('hidden');
 
-                // 🔥 Trigger Browser Print Dialog IMMEDIATELY
+                // 🔥 Trigger Thermal Frame Print Dialog IMMEDIATELY
                 setTimeout(() => {
-                    window.print();
+                    printThermalReceipt();
                 }, 300);
 
             } catch (e) {
@@ -851,10 +823,66 @@
         };
 
         window.finalPrintAndClose = async (id) => {
-            window.print(); // Direct to printer
+            printThermalReceipt(); // Send perfectly to 58mm
             closePreview();
             document.getElementById('item-selector-input').focus();
         };
+
+        // --- ISOLATED 58MM PRINT PROCESS ---
+        function printThermalReceipt() {
+            const receiptHtml = document.getElementById('receipt-print-area').innerHTML;
+            
+            // Create an invisible iframe to isolate the print layout from Tailwind CSS
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'fixed';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = '0';
+            document.body.appendChild(iframe);
+            
+            const printDoc = iframe.contentWindow.document;
+            printDoc.open();
+            // Inject strict 58mm CSS into the iframe
+            printDoc.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Receipt</title>
+                    <style>
+                        /* Forces the Browser to recognize this strictly as a 58mm roll page */
+                        @page { 
+                            margin: 0; 
+                            size: 58mm auto; 
+                        }
+                        body { 
+                            margin: 0; 
+                            padding: 0; 
+                            width: 58mm; 
+                            font-family: 'Inter', sans-serif; 
+                            color: black; 
+                            background: white; 
+                        }
+                        * { box-sizing: border-box; }
+                    </style>
+                </head>
+                <body>
+                    ${receiptHtml}
+                </body>
+                </html>
+            `);
+            printDoc.close();
+
+            iframe.contentWindow.focus();
+            
+            // Execute print after giving the frame a fraction of a second to render
+            setTimeout(() => {
+                iframe.contentWindow.print();
+                // Remove the iframe after the print dialogue finishes/closes
+                setTimeout(() => document.body.removeChild(iframe), 1000);
+            }, 300);
+        }
 
         function generateReceiptHTMLString(data, id) {
             const dateObj = new Date(data.date);
@@ -883,8 +911,9 @@
 
             totalSavings += (data.billDiscount || 0);
 
+            // Using width: 100% and max-width: 58mm allows it to adapt perfectly to the new 58mm iframe body
             return `
-                <div style="width: 58mm; padding: 5px; font-family: sans-serif; color: black; background:white; margin:0 auto;">
+                <div style="width: 100%; max-width: 58mm; padding: 2mm; font-family: sans-serif; color: black; background:white; margin:0 auto; box-sizing: border-box;">
                     <div style="text-align: center; font-weight: bold; font-size: 16px;">BM SUPER</div>
                     <div style="text-align: center; font-size: 10px;">බී එම් සුපර් (ලාභ කඩේ)</div>
                     <div style="text-align: center; font-size: 10px;">අරුණපුර, තලාව.</div>
