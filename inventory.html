@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>B M Super - Inventory Control</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Google Font (Inter & Noto Sans Sinhala) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+Sinhala:wght@400;700&display=swap" rel="stylesheet">
+    <!-- PDF Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        body { font-family: 'Inter', 'Noto Sans Sinhala', sans-serif; background-color: #f8fafc; -webkit-tap-highlight-color: transparent; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Row Highlights */
+        .low-stock-row { background-color: #fff7ed; } /* Orange tint */
+        .expired-row { background-color: #fef2f2; } /* Red tint */
+        
+        /* Hidden Print Area */
+        #report-print-area {
+            position: fixed; top: -9999px; left: 0; z-index: -100;
+            width: 210mm; /* A4 Width */
+            background: white; color: black;
+            font-family: 'Inter', 'Noto Sans Sinhala', sans-serif;
+        }
+    </style>
+</head>
+<body class="text-slate-800 min-h-screen flex flex-col">
+
+    <!-- === LOADING OVERLAY === -->
+    <div id="loading-overlay" class="fixed inset-0 z-[60] bg-white flex items-center justify-center">
+        <div class="flex flex-col items-center">
+            <div class="w-12 h-12 border-4 border-emerald-100 border-t-emerald-600 rounded-full animate-spin"></div>
+            <p class="text-xs font-bold text-emerald-600 mt-4 animate-pulse">Loading Inventory...</p>
+        </div>
+    </div>
+
+    <!-- === LOGIN OVERLAY (UPDATED) === -->
+    <div id="login-overlay" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-[url('https://images.unsplash.com/photo-1553413077-190dd305871c?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center hidden">
+        <div class="absolute inset-0 bg-slate-900/80 backdrop-blur-sm"></div>
+        
+        <div class="relative bg-white w-full max-w-[400px] p-8 rounded-3xl shadow-2xl text-center border border-white/20">
+            <!-- Icon -->
+            <div class="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-5 text-3xl shadow-sm">
+                <i class="ph ph-shopping-cart"></i>
+            </div>
+            
+            <h1 class="text-2xl font-bold text-slate-800">POS Terminal</h1>
+            <p class="text-slate-400 text-sm mb-8 font-medium">Please authenticate to continue</p>
+            
+            <!-- Admin Login -->
+            <button onclick="handleGoogleLogin()" class="w-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-3 transition shadow-sm active:scale-95 group">
+                <img src="https://www.google.com/favicon.ico" class="w-5 h-5 opacity-80 group-hover:opacity-100 transition">
+                <span>Admin Access (Google)</span>
+            </button>
+            
+            <!-- Divider -->
+            <div class="relative my-6">
+                <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-100"></div></div>
+                <div class="relative flex justify-center text-[10px] uppercase font-bold tracking-widest"><span class="bg-white px-2 text-slate-300">or Staff Login</span></div>
+            </div>
+
+            <!-- Staff Login -->
+            <div class="space-y-3">
+                <input type="email" id="staff-email" placeholder="Email / Username" class="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition placeholder-slate-400">
+                <input type="password" id="staff-password" placeholder="Password" class="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition placeholder-slate-400">
+                
+                <button onclick="handleStaffLogin()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-indigo-200 transition active:scale-95 mt-2">
+                    Sign In
+                </button>
+            </div>
+
+            <div class="mt-6">
+                <button class="text-xs font-semibold text-slate-400 hover:text-indigo-600 transition">Need an account?</button>
+            </div>
+
+            <p id="login-error" class="text-red-500 text-xs mt-4 font-bold hidden bg-red-50 p-2 rounded-lg border border-red-100"></p>
+        </div>
+    </div>
+
+    <!-- === HEADER === -->
+    <header class="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-30 px-4 sm:px-6 h-16 flex items-center justify-between shadow-sm">
+        <div class="flex items-center gap-4">
+            <a href="https://bmsuperdashboard.netlify.app/" class="w-10 h-10 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center transition border border-slate-200" title="Back to Dashboard">
+                <i class="ph ph-arrow-left text-xl"></i>
+            </a>
+            <div>
+                <h1 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <i class="ph ph-package text-emerald-600"></i> Inventory
+                </h1>
+                <p class="text-[10px] text-slate-500 font-medium hidden sm:block">Manage Stock & Pricing</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <button onclick="openReportsModal()" class="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition">
+                <i class="ph ph-file-pdf text-lg"></i> Reports
+            </button>
+            <button onclick="openItemModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-lg shadow-emerald-200 flex items-center gap-2 transition">
+                <i class="ph ph-plus text-lg"></i> Add Item
+            </button>
+            <div class="w-px h-6 bg-slate-300 mx-1"></div>
+            <button onclick="logout()" class="w-10 h-10 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl flex items-center justify-center transition">
+                <i class="ph ph-sign-out text-xl"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- === MAIN CONTENT === -->
+    <main class="flex-1 max-w-[1600px] w-full mx-auto p-4 lg:p-6 space-y-6">
+
+        <!-- STATS CARDS -->
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <!-- Total Value -->
+            <div class="bg-gradient-to-br from-emerald-600 to-teal-600 rounded-2xl p-5 text-white shadow-xl shadow-emerald-200 relative overflow-hidden group">
+                <div class="relative z-10">
+                    <div class="flex items-center gap-2 text-emerald-100 mb-1">
+                        <i class="ph ph-coins"></i>
+                        <span class="text-xs font-bold uppercase tracking-wider">Stock Value</span>
+                    </div>
+                    <h2 id="stat-total-value" class="text-3xl font-extrabold tracking-tight">LKR 0.00</h2>
+                    <p class="text-[10px] text-emerald-200 mt-1">Total Cost Valuation</p>
+                </div>
+                <div class="absolute -right-4 -bottom-4 bg-white/10 w-24 h-24 rounded-full blur-2xl group-hover:scale-150 transition duration-700"></div>
+            </div>
+
+            <!-- Low Stock -->
+            <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm relative overflow-hidden group">
+                <div class="relative z-10">
+                    <div class="flex items-center gap-2 text-slate-400 mb-1">
+                        <i class="ph ph-warning-octagon text-orange-500"></i>
+                        <span class="text-xs font-bold uppercase tracking-wider">Low Stock</span>
+                    </div>
+                    <h2 id="stat-low-stock" class="text-3xl font-extrabold text-orange-500">0</h2>
+                    <p class="text-[10px] text-slate-400 mt-1">Reorder needed</p>
+                </div>
+            </div>
+
+            <!-- Expiring -->
+            <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm relative overflow-hidden group">
+                <div class="relative z-10">
+                    <div class="flex items-center gap-2 text-slate-400 mb-1">
+                        <i class="ph ph-hourglass-low text-red-500"></i>
+                        <span class="text-xs font-bold uppercase tracking-wider">Expiring</span>
+                    </div>
+                    <h2 id="stat-expired" class="text-3xl font-extrabold text-red-500">0</h2>
+                    <p class="text-[10px] text-slate-400 mt-1">Within 30 days</p>
+                </div>
+            </div>
+
+            <!-- Total Items -->
+            <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm relative overflow-hidden group">
+                <div class="relative z-10">
+                    <div class="flex items-center gap-2 text-slate-400 mb-1">
+                        <i class="ph ph-package text-blue-500"></i>
+                        <span class="text-xs font-bold uppercase tracking-wider">Total Items</span>
+                    </div>
+                    <h2 id="stat-total-items" class="text-3xl font-extrabold text-slate-800">0</h2>
+                    <p class="text-[10px] text-slate-400 mt-1">Active SKUs</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- LIST CONTAINER -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden min-h-[600px]">
+            
+            <!-- Toolbar -->
+            <div class="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div class="relative w-full md:w-96 group">
+                    <i class="ph ph-magnifying-glass absolute left-3 top-3 text-slate-400 text-lg group-focus-within:text-emerald-500 transition"></i>
+                    <input type="text" id="search-input" oninput="renderInventory()" placeholder="Search Name, Barcode or Category..." 
+                        class="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition shadow-sm">
+                </div>
+                
+                <div class="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+                    <label class="flex-shrink-0 flex items-center gap-2 cursor-pointer bg-white px-3 py-2 rounded-xl border border-slate-200 shadow-sm hover:border-orange-200 hover:bg-orange-50/30 transition select-none">
+                        <input type="checkbox" id="filter-low-stock" onchange="renderInventory()" class="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer">
+                        <span class="text-xs font-bold text-slate-600">Low Stock</span>
+                    </label>
+                    <label class="flex-shrink-0 flex items-center gap-2 cursor-pointer bg-white px-3 py-2 rounded-xl border border-slate-200 shadow-sm hover:border-red-200 hover:bg-red-50/30 transition select-none">
+                        <input type="checkbox" id="filter-expired" onchange="renderInventory()" class="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer">
+                        <span class="text-xs font-bold text-slate-600">Expired</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- List Content -->
+            <div class="flex-1 overflow-x-auto">
+                <table class="w-full text-left border-collapse min-w-[900px]">
+                    <thead class="bg-slate-50 text-[10px] uppercase text-slate-500 font-bold border-b border-slate-200 sticky top-0 z-10">
+                        <tr>
+                            <th class="p-4 pl-6">Product & Category</th>
+                            <th class="p-4">Expiry Date</th>
+                            <th class="p-4 text-center">Stock</th>
+                            <th class="p-4 text-right">Cost (WAC)</th>
+                            <th class="p-4 text-right">Market</th>
+                            <th class="p-4 text-right">Our Price</th>
+                            <th class="p-4 text-right">Value</th>
+                            <th class="p-4 pr-6 text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inventory-list" class="text-sm divide-y divide-slate-100">
+                        <!-- Filled by JS -->
+                    </tbody>
+                </table>
+                <div id="empty-state" class="hidden flex flex-col items-center justify-center h-64 text-slate-300">
+                    <i class="ph ph-package text-4xl mb-2"></i>
+                    <p class="text-sm font-bold">No items found</p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- === ADD/EDIT ITEM MODAL === -->
+    <div id="item-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm hidden fade-in p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all scale-100">
+            <div class="p-5 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                <h3 id="modal-title" class="font-bold text-slate-800">Add New Item</h3>
+                <button onclick="closeItemModal()" class="text-slate-400 hover:text-red-500 transition"><i class="ph ph-x text-lg"></i></button>
+            </div>
+            
+            <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+                <input type="hidden" id="item-id">
+                
+                <div>
+                    <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Item Name</label>
+                    <input type="text" id="item-name" class="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Barcode</label>
+                        <input type="text" id="item-barcode" class="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-mono text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Category</label>
+                        <input type="text" id="item-category" list="category-list" class="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:border-emerald-500" placeholder="e.g. Dry Food">
+                        <datalist id="category-list">
+                            <option value="Dry Food">
+                            <option value="Beverages">
+                            <option value="Dairy">
+                            <option value="Frozen">
+                            <option value="Household">
+                            <option value="Personal Care">
+                        </datalist>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Expiry Date</label>
+                        <input type="date" id="item-expiry" class="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Unit</label>
+                        <select id="item-unit" class="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:border-emerald-500">
+                            <option value="unit">Unit (Piece)</option>
+                            <option value="kg">Kilogram (kg)</option>
+                            <option value="g">Gram (g)</option>
+                            <option value="l">Liter (l)</option>
+                            <option value="m">Meter (m)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Cost (WAC)</label>
+                        <input type="number" id="item-cost" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Market Price</label>
+                        <input type="number" id="item-market" class="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Our Price</label>
+                        <input type="number" id="item-sale" class="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-emerald-600 outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Current Stock</label>
+                        <input type="number" id="item-stock" class="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-red-400 mb-1">Min Stock Alert</label>
+                        <input type="number" id="item-min" value="5" class="w-full p-3 bg-red-50 border border-red-100 rounded-xl text-sm font-bold text-red-600 outline-none focus:border-red-500">
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-5 bg-slate-50 border-t border-slate-100 flex gap-3">
+                <button onclick="closeItemModal()" class="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-200 rounded-xl transition">Cancel</button>
+                <button onclick="saveItem()" class="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-200 transition">Save Item</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- === REPORTS MODAL === -->
+    <div id="reports-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm hidden fade-in p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div class="p-5 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="font-bold text-slate-800">Generate Reports</h3>
+                <button onclick="closeReportsModal()" class="text-slate-400 hover:text-slate-600"><i class="ph ph-x text-lg"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Report Type</label>
+                    <select id="report-type" class="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none">
+                        <option value="pricelist">Price List (Shelf Labels)</option>
+                        <option value="valuation">Inventory Valuation</option>
+                        <option value="lowstock">Low Stock Alert</option>
+                        <option value="expiry">Expiry Report (Next 30 Days)</option>
+                    </select>
+                </div>
+                <div class="p-3 bg-blue-50 rounded-xl text-xs text-blue-700">
+                    Reports support Sinhala text and are generated based on currently available live data.
+                </div>
+            </div>
+            <div class="p-5 bg-slate-50 border-t border-slate-100">
+                <button onclick="generateReport()" class="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition flex items-center justify-center gap-2">
+                    <i class="ph ph-file-pdf text-lg"></i> Download PDF
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- === HIDDEN PRINT AREA === -->
+    <div id="report-print-area"></div>
+
+    <!-- === LOGIC === -->
+    <script type="module">
+        // --- CONFIG ---
+        const firebaseConfig = { apiKey: "AIzaSyBetGQgGj4ffCRQRK2Em45OoRLeKOQ4ImA", authDomain: "bm-super.firebaseapp.com", projectId: "bm-super", storageBucket: "bm-super.firebasestorage.app", messagingSenderId: "1003875788144", appId: "1:1003875788144:web:5c9875e0ae4524f9df9bb5", measurementId: "G-LKTKS45TH0" };
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, signInWithPopup, signInWithEmailAndPassword, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const LKR = new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', minimumFractionDigits: 2 });
+        const ADMIN_EMAIL = "yasasdananjaya77@gmail.com";
+
+        // --- STATE ---
+        let inventory = [];
+
+        // --- AUTH ---
+        window.handleGoogleLogin = async () => {
+            const errorEl = document.getElementById('login-error');
+            errorEl.classList.add('hidden');
+            
+            try {
+                const result = await signInWithPopup(auth, new GoogleAuthProvider());
+                const user = result.user;
+                
+                // Strictly enforce email check for Google Sign In
+                if (user.email !== ADMIN_EMAIL) {
+                    await signOut(auth);
+                    errorEl.textContent = "Unauthorized: Google Admin Access Only.";
+                    errorEl.classList.remove('hidden');
+                }
+                // If success, onAuthStateChanged will handle the rest
+            } catch (error) {
+                console.error(error);
+                errorEl.textContent = "Login Failed: " + error.message;
+                errorEl.classList.remove('hidden');
+            }
+        };
+
+        window.handleStaffLogin = async () => {
+            const email = document.getElementById('staff-email').value;
+            const password = document.getElementById('staff-password').value;
+            const errorEl = document.getElementById('login-error');
+            
+            errorEl.classList.add('hidden');
+
+            if(!email || !password) {
+                errorEl.textContent = "Please enter both Email and Password";
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                // Success is handled by onAuthStateChanged
+            } catch (error) {
+                console.error(error);
+                errorEl.textContent = "Invalid Credentials. Please try again.";
+                errorEl.classList.remove('hidden');
+            }
+        };
+
+        window.logout = () => signOut(auth);
+
+        onAuthStateChanged(auth, user => {
+            if (user) {
+                document.getElementById('login-overlay').classList.add('hidden');
+                initData();
+            } else {
+                document.getElementById('login-overlay').classList.remove('hidden');
+                document.getElementById('loading-overlay').classList.add('hidden');
+            }
+        });
+
+        // --- DATA SYNC ---
+        function initData() {
+            onSnapshot(collection(db, "inventory"), (snap) => {
+                inventory = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                updateStats();
+                renderInventory();
+                document.getElementById('loading-overlay').classList.add('hidden');
+            });
+        }
+
+        function updateStats() {
+            let totalValue = 0;
+            let lowStockCount = 0;
+            let expiredCount = 0;
+            const today = new Date();
+            const warningDate = new Date();
+            warningDate.setDate(today.getDate() + 30);
+
+            inventory.forEach(i => {
+                const qty = parseFloat(i.stockQuantity || 0);
+                const cost = parseFloat(i.costPrice || 0);
+                const min = parseFloat(i.minStock || 5);
+                const expiry = i.expiryDate ? new Date(i.expiryDate) : null;
+
+                totalValue += (qty * cost);
+                if (qty <= min) lowStockCount++;
+                if (expiry && expiry <= warningDate) expiredCount++;
+            });
+
+            document.getElementById('stat-total-value').textContent = LKR.format(totalValue);
+            document.getElementById('stat-low-stock').textContent = lowStockCount;
+            document.getElementById('stat-expired').textContent = expiredCount;
+            document.getElementById('stat-total-items').textContent = inventory.length;
+        }
+
+        // --- RENDER ---
+        window.renderInventory = () => {
+            const tbody = document.getElementById('inventory-list');
+            const search = document.getElementById('search-input').value.toLowerCase();
+            const filterLow = document.getElementById('filter-low-stock').checked;
+            const filterExpired = document.getElementById('filter-expired').checked;
+            
+            tbody.innerHTML = '';
+
+            const today = new Date();
+            const warningDate = new Date();
+            warningDate.setDate(today.getDate() + 30);
+
+            const filtered = inventory.filter(i => {
+                const matchesSearch = (i.name || '').toLowerCase().includes(search) || (i.barcode || '').includes(search) || (i.category || '').toLowerCase().includes(search);
+                const isLow = (i.stockQuantity || 0) <= (i.minStock || 5);
+                const expiry = i.expiryDate ? new Date(i.expiryDate) : null;
+                const isExpired = expiry && expiry <= warningDate;
+                
+                if (filterLow && !isLow) return false;
+                if (filterExpired && !isExpired) return false;
+                return matchesSearch;
+            });
+
+            if(filtered.length === 0) {
+                document.getElementById('empty-state').classList.remove('hidden');
+                return;
+            } else {
+                document.getElementById('empty-state').classList.add('hidden');
+            }
+
+            filtered.forEach(i => {
+                const qty = parseFloat(i.stockQuantity || 0);
+                const cost = parseFloat(i.costPrice || 0);
+                const value = qty * cost;
+                const isLow = qty <= (i.minStock || 5);
+                const expiry = i.expiryDate ? new Date(i.expiryDate) : null;
+                const isExpired = expiry && expiry <= today;
+                const isNearExpiry = expiry && !isExpired && expiry <= warningDate;
+
+                let rowClass = 'hover:bg-slate-50 border-b border-slate-100';
+                if(isExpired) rowClass = 'expired-row border-b border-red-200';
+                else if(isNearExpiry) rowClass = 'bg-yellow-50 hover:bg-yellow-100 border-b border-yellow-200';
+                else if(isLow) rowClass = 'low-stock-row border-b border-orange-100';
+
+                tbody.innerHTML += `
+                    <tr class="${rowClass} transition group">
+                        <td class="p-4 pl-6">
+                            <div class="font-bold text-slate-800">${i.name}</div>
+                            <div class="text-xs text-slate-400 font-mono flex items-center gap-2">
+                                <span>${i.barcode || 'No Barcode'}</span>
+                                ${i.category ? `<span class="bg-slate-100 text-slate-500 px-1.5 rounded-sm">${i.category}</span>` : ''}
+                            </div>
+                        </td>
+                        <td class="p-4 text-xs font-semibold ${isExpired ? 'text-red-600' : 'text-slate-600'}">
+                            ${i.expiryDate || '-'}
+                        </td>
+                        <td class="p-4 text-center">
+                            <span class="px-2 py-1 rounded font-bold text-sm ${isLow ? 'bg-orange-100 text-orange-600' : 'bg-emerald-50 text-emerald-600'}">
+                                ${qty} ${i.unit || ''}
+                            </span>
+                        </td>
+                        <td class="p-4 text-right text-slate-600">${cost.toFixed(2)}</td>
+                        <td class="p-4 text-right text-slate-400">${(i.marketPrice || 0).toFixed(2)}</td>
+                        <td class="p-4 text-right font-bold text-emerald-600">${(i.ourPrice || 0).toFixed(2)}</td>
+                        <td class="p-4 text-right font-bold text-slate-800">${value.toFixed(2)}</td>
+                        <td class="p-4 pr-6 text-center">
+                            <button onclick="editItem('${i.id}')" class="text-indigo-500 hover:text-indigo-700 p-2 rounded hover:bg-indigo-50 transition"><i class="ph ph-pencil-simple text-lg"></i></button>
+                            <button onclick="deleteItem('${i.id}')" class="text-red-400 hover:text-red-600 p-2 rounded hover:bg-red-50 transition ml-1"><i class="ph ph-trash text-lg"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+        };
+
+        // --- CRUD OPERATIONS ---
+        window.openItemModal = () => {
+            document.getElementById('modal-title').innerText = "Add New Item";
+            document.getElementById('item-id').value = '';
+            
+            ['item-name', 'item-barcode', 'item-category', 'item-expiry', 'item-cost', 'item-market', 'item-sale', 'item-stock'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('item-min').value = 5;
+            document.getElementById('item-unit').value = 'unit';
+            
+            document.getElementById('item-modal').classList.remove('hidden');
+        };
+
+        window.closeItemModal = () => document.getElementById('item-modal').classList.add('hidden');
+
+        window.editItem = (id) => {
+            const i = inventory.find(x => x.id === id);
+            if(!i) return;
+
+            document.getElementById('modal-title').innerText = "Edit Item";
+            document.getElementById('item-id').value = id;
+            
+            document.getElementById('item-name').value = i.name;
+            document.getElementById('item-barcode').value = i.barcode || '';
+            document.getElementById('item-category').value = i.category || '';
+            document.getElementById('item-expiry').value = i.expiryDate || '';
+            document.getElementById('item-unit').value = i.unit || 'unit';
+            document.getElementById('item-cost').value = i.costPrice;
+            document.getElementById('item-market').value = i.marketPrice;
+            document.getElementById('item-sale').value = i.ourPrice;
+            document.getElementById('item-stock').value = i.stockQuantity;
+            document.getElementById('item-min').value = i.minStock || 5;
+
+            document.getElementById('item-modal').classList.remove('hidden');
+        };
+
+        window.saveItem = async () => {
+            const id = document.getElementById('item-id').value;
+            const data = {
+                name: document.getElementById('item-name').value,
+                barcode: document.getElementById('item-barcode').value,
+                category: document.getElementById('item-category').value,
+                expiryDate: document.getElementById('item-expiry').value,
+                unit: document.getElementById('item-unit').value,
+                costPrice: parseFloat(document.getElementById('item-cost').value) || 0,
+                marketPrice: parseFloat(document.getElementById('item-market').value) || 0,
+                ourPrice: parseFloat(document.getElementById('item-sale').value) || 0,
+                stockQuantity: parseFloat(document.getElementById('item-stock').value) || 0,
+                minStock: parseFloat(document.getElementById('item-min').value) || 0,
+                updatedAt: new Date().toISOString()
+            };
+
+            if(!data.name) return alert("Item Name is required");
+
+            try {
+                if(id) {
+                    await updateDoc(doc(db, "inventory", id), data);
+                } else {
+                    data.createdAt = new Date().toISOString();
+                    await addDoc(collection(db, "inventory"), data);
+                }
+                closeItemModal();
+            } catch(e) {
+                console.error(e);
+                alert("Error saving item: " + e.message);
+            }
+        };
+
+        window.deleteItem = async (id) => {
+            if(confirm("Are you sure you want to delete this item?")) {
+                try {
+                    await deleteDoc(doc(db, "inventory", id));
+                } catch(e) {
+                    console.error(e);
+                    alert("Error deleting item");
+                }
+            }
+        };
+
+        // --- REPORTS (HTML TO PDF FOR SINHALA SUPPORT) ---
+        window.openReportsModal = () => document.getElementById('reports-modal').classList.remove('hidden');
+        window.closeReportsModal = () => document.getElementById('reports-modal').classList.add('hidden');
+
+        window.generateReport = () => {
+            document.getElementById('loading-overlay').classList.remove('hidden');
+            const type = document.getElementById('report-type').value;
+            
+            // Filter Data based on report type
+            let reportData = [];
+            let columns = [];
+            let title = "";
+
+            if(type === 'pricelist') {
+                title = "Price List";
+                columns = ["Product", "Barcode", "Category", "Market Price", "Our Price"];
+                reportData = inventory.map(i => [i.name, i.barcode || '-', i.category || '-', (i.marketPrice||0).toFixed(2), (i.ourPrice||0).toFixed(2)]);
+            } else if (type === 'valuation') {
+                title = "Inventory Valuation";
+                columns = ["Product", "Category", "Stock", "Cost (WAC)", "Value"];
+                let total = 0;
+                inventory.forEach(i => {
+                    const val = (i.stockQuantity || 0) * (i.costPrice || 0);
+                    total += val;
+                    reportData.push([i.name, i.category || '-', i.stockQuantity, i.costPrice.toFixed(2), val.toFixed(2)]);
+                });
+                reportData.push(["TOTAL ASSETS", "", "", "", total.toFixed(2)]);
+            } else if (type === 'lowstock') {
+                title = "Low Stock Alert";
+                columns = ["Product", "Stock", "Min Level", "Reorder Qty"];
+                inventory.filter(i => (i.stockQuantity || 0) <= (i.minStock || 5)).forEach(i => {
+                    reportData.push([i.name, i.stockQuantity, i.minStock || 5, ((i.minStock || 5) * 2) - (i.stockQuantity || 0)]);
+                });
+            } else if (type === 'expiry') {
+                title = "Expiry Report (Next 30 Days)";
+                columns = ["Product", "Expiry Date", "Stock", "Status"];
+                const today = new Date();
+                const warningDate = new Date();
+                warningDate.setDate(today.getDate() + 30);
+                
+                inventory.forEach(i => {
+                    if(i.expiryDate) {
+                        const exp = new Date(i.expiryDate);
+                        if(exp <= warningDate) {
+                            const status = exp < today ? "EXPIRED" : "Expiring Soon";
+                            reportData.push([i.name, i.expiryDate, i.stockQuantity, status]);
+                        }
+                    }
+                });
+            }
+
+            // Build HTML
+            let rowsHtml = reportData.map(row => `
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                    ${row.map(cell => `<td style="padding: 8px;">${cell}</td>`).join('')}
+                </tr>
+            `).join('');
+
+            const htmlContent = `
+                <div style="padding: 40px; background: white;">
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <h1 style="font-size: 24px; font-weight: bold; color: #059669; margin: 0;">B M SUPER</h1>
+                        <p style="font-size: 14px; color: #555; margin: 5px 0;">${title}</p>
+                        <p style="font-size: 12px; color: #888;">Generated on: ${new Date().toLocaleString()}</p>
+                    </div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                        <thead>
+                            <tr style="background: #059669; color: white;">
+                                ${columns.map(col => `<th style="padding: 10px; text-align: left;">${col}</th>`).join('')}
+                            </tr>
+                        </thead>
+                        <tbody>${rowsHtml}</tbody>
+                    </table>
+                </div>
+            `;
+
+            const printArea = document.getElementById('report-print-area');
+            printArea.innerHTML = htmlContent;
+
+            setTimeout(async () => {
+                try {
+                    const canvas = await html2canvas(printArea, { scale: 2 });
+                    const imgData = canvas.toDataURL('image/png');
+                    const { jsPDF } = window.jspdf;
+                    const pdf = new jsPDF('p', 'mm', 'a4');
+                    const imgWidth = 210;
+                    const pageHeight = 295;
+                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                    let heightLeft = imgHeight;
+                    let position = 0;
+
+                    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= pageHeight;
+
+                    while (heightLeft >= 0) {
+                        position = heightLeft - imgHeight;
+                        pdf.addPage();
+                        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                        heightLeft -= pageHeight;
+                    }
+                    
+                    pdf.save(`${title.replace(/ /g, "_")}.pdf`);
+                    document.getElementById('loading-overlay').classList.add('hidden');
+                    closeReportsModal();
+                } catch(e) {
+                    console.error(e);
+                    alert("Report Generation Failed");
+                    document.getElementById('loading-overlay').classList.add('hidden');
+                }
+            }, 500);
+        };
+
+    </script>
+</body>
+</html>

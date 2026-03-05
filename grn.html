@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>B M Super - Purchase (GRN)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Google Fonts: Inter (English) & Noto Sans Sinhala (Sinhala) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+Sinhala:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- PDF Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+    <style>
+        /* Default Font */
+        body { font-family: 'Inter', sans-serif; background-color: #f0f4f8; -webkit-tap-highlight-color: transparent; }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Custom inputs for the login screen to match image */
+        .login-input {
+            background-color: #F9FAFB; /* gray-50 */
+            border: 1px solid #E5E7EB; /* gray-200 */
+            transition: all 0.2s;
+        }
+        .login-input:focus {
+            background-color: #ffffff;
+            border-color: #6366F1; /* indigo-500 */
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+    </style>
+</head>
+<body class="text-slate-800 min-h-screen flex flex-col">
+
+    <!-- === LOADING OVERLAY === -->
+    <div id="loading-overlay" class="fixed inset-0 z-[60] bg-white flex items-center justify-center">
+        <div class="flex flex-col items-center">
+            <div class="w-12 h-12 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
+            <p class="text-xs font-bold text-indigo-600 mt-4 animate-pulse">Processing...</p>
+        </div>
+    </div>
+
+    <!-- === LOGIN OVERLAY === -->
+    <div id="login-overlay" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-[url('https://images.unsplash.com/photo-1578916171728-46686eac8d58?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center hidden">
+        <!-- Background Overlay -->
+        <div class="absolute inset-0 bg-slate-900/90 backdrop-blur-sm"></div>
+        
+        <!-- Login Card -->
+        <div class="relative bg-white w-full max-w-[420px] p-8 sm:p-10 rounded-[2rem] shadow-2xl text-center mx-4 fade-in border border-white/10">
+            
+            <!-- Icon -->
+            <div class="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-5 text-3xl shadow-sm">
+                <i class="ph-fill ph-shopping-cart"></i>
+            </div>
+            
+            <!-- Titles -->
+            <h1 class="text-2xl font-bold text-slate-800 mb-1 tracking-tight">POS Terminal</h1>
+            <p class="text-slate-400 text-sm font-medium mb-8">Please authenticate to continue</p>
+
+            <!-- Login Error Message (Hidden by default) -->
+            <div id="login-error" class="hidden bg-red-50 text-red-600 text-xs p-3 rounded-xl mb-6 text-left border border-red-100 flex items-start gap-2">
+                <i class="ph-fill ph-warning-circle text-lg shrink-0 mt-0.5"></i>
+                <span id="login-error-text" class="font-medium">Error message here</span>
+            </div>
+
+            <!-- Google Button -->
+            <button onclick="handleGoogleLogin()" class="w-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-3 transition shadow-sm active:scale-[0.98] group">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5 h-5" alt="G">
+                <span class="group-hover:text-slate-900">Admin Access (Google)</span>
+            </button>
+
+            <!-- Separator -->
+            <div class="relative my-8">
+                <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-200"></div></div>
+                <div class="relative flex justify-center text-[10px] uppercase text-slate-400 font-bold tracking-widest">
+                    <span class="bg-white px-3">OR STAFF LOGIN</span>
+                </div>
+            </div>
+
+            <!-- Email Form -->
+            <div class="space-y-4 text-left">
+                <input type="email" id="login-email" placeholder="Email / Username" class="login-input w-full px-4 py-3.5 rounded-xl text-sm font-semibold outline-none text-slate-700 placeholder:text-slate-400">
+                
+                <input type="password" id="login-pass" placeholder="Password" class="login-input w-full px-4 py-3.5 rounded-xl text-sm font-semibold outline-none text-slate-700 placeholder:text-slate-400">
+            </div>
+
+            <!-- Sign In Button -->
+            <button onclick="handleEmailLogin()" class="w-full bg-[#4F46E5] hover:bg-[#4338ca] text-white font-bold py-3.5 px-4 rounded-xl mt-6 shadow-lg shadow-indigo-200/50 transition active:scale-[0.98] text-sm tracking-wide">
+                Sign In
+            </button>
+
+            <!-- Create Account Link -->
+            <div class="mt-6">
+                <button onclick="toggleRegister()" class="text-xs font-semibold text-slate-400 hover:text-indigo-600 transition">Need an account?</button>
+            </div>
+             <div id="register-btn-area" class="hidden mt-2 fade-in">
+                 <button onclick="handleRegister()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 px-4 rounded-xl text-xs transition">
+                    Create New Staff Account
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- === HEADER === -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 px-4 sm:px-6 h-16 flex items-center justify-between shadow-sm">
+        <div class="flex items-center gap-4">
+            <a href="https://bmsuperdashboard.netlify.app/" class="w-10 h-10 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center transition" title="Back to Dashboard">
+                <i class="ph ph-arrow-left text-xl"></i>
+            </a>
+            <div>
+                <h1 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <i class="ph ph-truck text-cyan-600"></i> Good Received Note
+                </h1>
+                <p class="text-[10px] text-slate-500 font-medium hidden sm:block">Add Stock & Calculate Cost</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <span id="user-display" class="hidden sm:block text-xs font-bold text-cyan-700 bg-cyan-50 px-3 py-1.5 rounded-lg mr-2"></span>
+            
+            <button onclick="openHistoryModal()" class="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition">
+                <i class="ph ph-clock-counter-clockwise text-lg"></i> <span class="hidden sm:inline">History</span>
+            </button>
+            <button onclick="openReportsModal()" class="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition">
+                <i class="ph ph-file-pdf text-lg"></i> <span class="hidden sm:inline">Reports</span>
+            </button>
+            <div class="w-px h-6 bg-slate-300 mx-1"></div>
+            <button onclick="logout()" class="w-10 h-10 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl flex items-center justify-center transition" title="Logout">
+                <i class="ph ph-sign-out text-xl"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- === MAIN CONTENT === -->
+    <div class="flex-1 max-w-[1600px] w-full mx-auto p-4 lg:p-6 flex flex-col lg:flex-row gap-6 items-start">
+        
+        <!-- LEFT: INPUT FORM -->
+        <div class="w-full lg:w-1/3 flex flex-col gap-4">
+            
+            <!-- 1. Supplier & Invoice Info -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm uppercase tracking-wider">
+                    <i class="ph ph-user-gear text-lg text-cyan-600"></i> Supplier Details
+                </h3>
+                
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-400 uppercase">Select Supplier</label>
+                        <div class="flex gap-2">
+                            <select id="supplier-select" class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none focus:border-cyan-500">
+                                <option value="">Choose...</option>
+                            </select>
+                            <button onclick="openSupplierModal()" class="bg-cyan-100 hover:bg-cyan-200 text-cyan-700 px-3 rounded-xl border border-cyan-200 transition" title="Add New Supplier">
+                                <i class="ph ph-plus-circle text-xl"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-400 uppercase">Invoice / Ref No</label>
+                        <input type="text" id="grn-ref" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none focus:border-cyan-500" placeholder="e.g. INV-2024-001">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Item Entry Form -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 relative">
+                <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm uppercase tracking-wider">
+                    <i class="ph ph-package-plus text-lg text-cyan-600"></i> Add Items
+                </h3>
+
+                <!-- Search -->
+                <div class="mb-4 relative z-20">
+                    <label class="text-[10px] font-bold text-slate-400 uppercase">Search Item (Barcode/Name)</label>
+                    <div class="relative">
+                        <input type="text" id="item-search" oninput="handleSearch(this.value)" class="w-full pl-9 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100 transition" placeholder="Scan or Type..." autocomplete="off">
+                        <i class="ph ph-magnifying-glass absolute left-3 top-3.5 text-slate-400 text-lg"></i>
+                        <div id="search-results" class="hidden absolute top-full left-0 right-0 mt-2 bg-white border border-slate-100 rounded-xl shadow-2xl max-h-60 overflow-y-auto custom-scroll ring-1 ring-black/5"></div>
+                    </div>
+                </div>
+
+                <!-- Create New Toggle -->
+                <div id="new-item-form" class="hidden mb-4 p-3 bg-orange-50 rounded-xl border border-orange-100">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-xs font-bold text-orange-600 uppercase">New Item Mode</span>
+                        <button onclick="cancelNewItem()" class="text-xs font-bold text-slate-400 hover:text-slate-600">Cancel</button>
+                    </div>
+                    <div class="space-y-2">
+                        <input type="text" id="new-item-name" placeholder="Item Name" class="w-full px-3 py-2 bg-white border border-orange-200 rounded-lg text-sm font-semibold outline-none">
+                        <input type="text" id="new-item-barcode" placeholder="Barcode" class="w-full px-3 py-2 bg-white border border-orange-200 rounded-lg text-sm font-mono outline-none">
+                        <select id="new-item-unit" class="w-full px-3 py-2 bg-white border border-orange-200 rounded-lg text-sm outline-none">
+                            <option value="unit">Unit (Piece)</option>
+                            <option value="kg">Kilogram (kg)</option>
+                            <option value="g">Gram (g)</option>
+                            <option value="l">Liter (l)</option>
+                            <option value="m">Meter (m)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Existing Item Info -->
+                <div id="selected-item-display" class="hidden mb-4 p-3 bg-cyan-50 rounded-xl border border-cyan-100">
+                    <h4 id="sel-name" class="font-bold text-cyan-900 text-sm">Product Name</h4>
+                    <div class="flex gap-4 mt-1 text-xs text-cyan-700">
+                        <span>Current Stock: <b id="sel-stock">0</b></span>
+                        <span>Old Cost: <b id="sel-old-cost">0.00</b></span>
+                    </div>
+                    <input type="hidden" id="sel-id">
+                </div>
+
+                <!-- Pricing & Qty Grid -->
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-400 uppercase">Cost Price</label>
+                        <input type="number" id="inp-cost" placeholder="0.00" class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-cyan-500">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-400 uppercase">Quantity</label>
+                        <input type="number" id="inp-qty" placeholder="0" class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-cyan-500">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-400 uppercase">Market Price</label>
+                        <input type="number" id="inp-market" placeholder="0.00" class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-cyan-500">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-400 uppercase">Sale Price</label>
+                        <input type="number" id="inp-sale" placeholder="0.00" class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-cyan-500">
+                    </div>
+                </div>
+
+                <button onclick="addToGRN()" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl shadow-lg transition flex items-center justify-center gap-2">
+                    <i class="ph ph-plus text-lg"></i> Add to Note
+                </button>
+
+            </div>
+        </div>
+
+        <!-- RIGHT: GRN LIST & TOTALS -->
+        <div class="w-full lg:w-2/3 flex flex-col h-full gap-4">
+            
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden min-h-[500px]">
+                <div class="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                    <h3 class="font-bold text-slate-700">GRN Items</h3>
+                    <span class="text-xs font-bold text-slate-400" id="item-count">0 Items</span>
+                </div>
+                
+                <div class="flex-1 overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-slate-50 text-[10px] uppercase text-slate-500 font-bold border-b border-slate-200">
+                            <tr>
+                                <th class="p-4 pl-6">Item Details</th>
+                                <th class="p-4 text-right">Cost</th>
+                                <th class="p-4 text-center">Qty</th>
+                                <th class="p-4 text-right">Total</th>
+                                <th class="p-4 text-right">Sale Price</th>
+                                <th class="p-4 pr-6"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="grn-body" class="text-sm divide-y divide-slate-50">
+                            <!-- Items inserted here -->
+                        </tbody>
+                    </table>
+                    <div id="empty-state" class="flex flex-col items-center justify-center h-64 text-slate-300">
+                        <i class="ph ph-shopping-bag-open text-4xl mb-2"></i>
+                        <p class="text-sm font-bold">No items added yet</p>
+                    </div>
+                </div>
+
+                <!-- Footer Totals -->
+                <div class="bg-slate-900 text-white p-6">
+                    <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <div>
+                            <p class="text-slate-400 text-xs font-bold uppercase mb-1">Total Cost</p>
+                            <h2 id="total-amount" class="text-3xl font-extrabold tracking-tight">LKR 0.00</h2>
+                        </div>
+                        <button onclick="saveGRN()" class="w-full sm:w-auto bg-cyan-500 hover:bg-cyan-400 text-white font-bold px-8 py-3 rounded-xl shadow-lg shadow-cyan-900/50 transition flex items-center justify-center gap-2">
+                            <i class="ph ph-check-circle text-xl"></i> Complete GRN
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- === SUPPLIER CREATION MODAL === -->
+    <div id="supplier-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm hidden fade-in p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="p-5 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="font-bold text-slate-800">Add New Supplier</h3>
+                <button onclick="closeSupplierModal()" class="text-slate-400 hover:text-slate-600"><i class="ph ph-x text-lg"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Supplier Name</label>
+                    <input type="text" id="sup-name" class="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Phone / Contact</label>
+                    <input type="text" id="sup-phone" class="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Address / Details</label>
+                    <textarea id="sup-address" rows="2" class="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"></textarea>
+                </div>
+            </div>
+            <div class="p-5 bg-slate-50 border-t border-slate-100 flex gap-3">
+                <button onclick="closeSupplierModal()" class="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-200 rounded-xl transition">Cancel</button>
+                <button onclick="saveSupplier()" id="btn-save-supplier" class="flex-1 py-3 bg-cyan-600 text-white font-bold rounded-xl hover:bg-cyan-700 transition flex items-center justify-center gap-2">
+                    <span>Save Supplier</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- === REPORTS MODAL === -->
+    <div id="reports-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm hidden fade-in p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div class="p-5 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="font-bold text-slate-800">Generate Reports</h3>
+                <button onclick="closeReportsModal()" class="text-slate-400 hover:text-slate-600"><i class="ph ph-x text-lg"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Report Type</label>
+                    <select id="report-type" class="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none">
+                        <option value="summary">GRN Summary (Date Range)</option>
+                        <option value="itemwise">Item-Wise Purchase Report</option>
+                        <option value="supplierwise">Supplier Summary</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Report Language</label>
+                    <select id="report-lang" class="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none">
+                        <option value="en">English (With Sinhala Font Support)</option>
+                        <option value="si">Sinhala (සම්පූර්ණ සිංහල වාර්තාව)</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Start Date</label>
+                        <input type="date" id="rep-start" class="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">End Date</label>
+                        <input type="date" id="rep-end" class="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium">
+                    </div>
+                </div>
+            </div>
+            <div class="p-5 bg-slate-50 border-t border-slate-100">
+                <button onclick="generateReport()" class="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition flex items-center justify-center gap-2">
+                    <i class="ph ph-file-pdf text-lg"></i> Download PDF
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- === HISTORY MODAL === -->
+    <div id="history-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm hidden fade-in p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl h-[80vh] flex flex-col overflow-hidden">
+            <div class="p-5 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
+                <h3 class="font-bold text-slate-800">Recent GRNs</h3>
+                <button onclick="closeHistoryModal()" class="text-slate-400 hover:text-slate-600"><i class="ph ph-x text-lg"></i></button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 custom-scroll">
+                <table class="w-full text-left border-collapse">
+                    <thead class="text-xs uppercase text-slate-400 font-bold sticky top-0 bg-white">
+                        <tr>
+                            <th class="pb-2 border-b border-slate-100">Date</th>
+                            <th class="pb-2 border-b border-slate-100">Supplier</th>
+                            <th class="pb-2 border-b border-slate-100 text-right">Items</th>
+                            <th class="pb-2 border-b border-slate-100 text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-list" class="text-sm divide-y divide-slate-50">
+                        <!-- Filled by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- === LOGIC === -->
+    <script type="module">
+        // --- CONFIG ---
+        const firebaseConfig = { apiKey: "AIzaSyBetGQgGj4ffCRQRK2Em45OoRLeKOQ4ImA", authDomain: "bm-super.firebaseapp.com", projectId: "bm-super", storageBucket: "bm-super.firebasestorage.app", messagingSenderId: "1003875788144", appId: "1:1003875788144:web:5c9875e0ae4524f9df9bb5", measurementId: "G-LKTKS45TH0" };
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, updateDoc, doc, onSnapshot, getDocs, writeBatch, query, orderBy, limit, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const LKR = new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', minimumFractionDigits: 2 });
+        const AUTHORIZED_EMAIL = "yasasdananjaya77@gmail.com";
+
+        // --- STATE ---
+        let inventory = [];
+        let suppliers = [];
+        let grnItems = [];
+        let selectedItem = null; 
+
+        // --- AUTH ---
+
+        window.toggleRegister = () => {
+             const btnArea = document.getElementById('register-btn-area');
+             btnArea.classList.toggle('hidden');
+        };
+
+        function showLoginError(msg) {
+            const el = document.getElementById('login-error');
+            const txt = document.getElementById('login-error-text');
+            txt.textContent = msg;
+            el.classList.remove('hidden');
+        }
+
+        window.handleGoogleLogin = () => {
+            signInWithPopup(auth, new GoogleAuthProvider())
+                .then((result) => {
+                    if (result.user.email !== AUTHORIZED_EMAIL) {
+                        signOut(auth);
+                        showLoginError("Unauthorized Access. This Google account is not allowed.");
+                    }
+                })
+                .catch((error) => {
+                    console.error(error);
+                    showLoginError(error.message);
+                });
+        };
+
+        window.handleEmailLogin = () => {
+            const email = document.getElementById('login-email').value;
+            const pass = document.getElementById('login-pass').value;
+            if(!email || !pass) return showLoginError("Please enter email and password");
+            
+            signInWithEmailAndPassword(auth, email, pass)
+                .catch((error) => showLoginError(error.message));
+        };
+
+        window.handleRegister = () => {
+            const email = document.getElementById('login-email').value;
+            const pass = document.getElementById('login-pass').value;
+            if(!email || !pass) return showLoginError("Please enter email and password to create account");
+
+            createUserWithEmailAndPassword(auth, email, pass)
+                .then(() => alert("Account created! You are now logged in."))
+                .catch((error) => showLoginError(error.message));
+        };
+
+        window.logout = () => signOut(auth);
+
+        onAuthStateChanged(auth, user => {
+            if (user) {
+                // Secondary check for Google users
+                if (user.providerData[0].providerId === 'google.com' && user.email !== AUTHORIZED_EMAIL) {
+                    signOut(auth);
+                    document.getElementById('login-overlay').classList.remove('hidden');
+                    showLoginError("Unauthorized Access.");
+                    return;
+                }
+
+                document.getElementById('login-overlay').classList.add('hidden');
+                document.getElementById('user-display').textContent = user.email;
+                initData();
+                
+                // Set Default Dates for Reports
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('rep-start').value = today;
+                document.getElementById('rep-end').value = today;
+            } else {
+                document.getElementById('login-overlay').classList.remove('hidden');
+                document.getElementById('loading-overlay').classList.add('hidden');
+                document.getElementById('login-email').value = '';
+                document.getElementById('login-pass').value = '';
+                document.getElementById('login-error').classList.add('hidden');
+            }
+        });
+
+        // --- DATA SYNC ---
+        function initData() {
+            onSnapshot(collection(db, "inventory"), (snap) => {
+                inventory = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                document.getElementById('loading-overlay').classList.add('hidden');
+            });
+            onSnapshot(collection(db, "suppliers"), (snap) => {
+                suppliers = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderSupplierDropdown();
+            });
+        }
+
+        // --- SUPPLIER LOGIC ---
+        function renderSupplierDropdown() {
+            const sel = document.getElementById('supplier-select');
+            const currentVal = sel.value;
+            sel.innerHTML = `<option value="">Choose Supplier...</option>`;
+            suppliers.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                opt.textContent = s.name;
+                sel.appendChild(opt);
+            });
+            if(currentVal) sel.value = currentVal;
+        }
+
+        window.openSupplierModal = () => document.getElementById('supplier-modal').classList.remove('hidden');
+        window.closeSupplierModal = () => document.getElementById('supplier-modal').classList.add('hidden');
+
+        window.saveSupplier = async () => {
+            const name = document.getElementById('sup-name').value;
+            const phone = document.getElementById('sup-phone').value;
+            const address = document.getElementById('sup-address').value;
+            const btn = document.getElementById('btn-save-supplier');
+            
+            if(!name) return alert("Supplier Name Required");
+            
+            // UI Feedback
+            const originalBtnContent = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Saving...`;
+
+            try {
+                await addDoc(collection(db, "suppliers"), { 
+                    name, phone, address, createdAt: new Date().toISOString() 
+                });
+                closeSupplierModal();
+                document.getElementById('sup-name').value = '';
+                document.getElementById('sup-phone').value = '';
+                document.getElementById('sup-address').value = '';
+            } catch(e) { 
+                console.error(e); 
+                alert("Failed to save supplier"); 
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalBtnContent;
+            }
+        };
+
+        // --- ITEM SELECTION LOGIC ---
+        window.handleSearch = (val) => {
+            const results = document.getElementById('search-results');
+            val = val.trim().toLowerCase();
+            if(!val) { results.classList.add('hidden'); return; }
+
+            const exact = inventory.find(i => i.barcode === val);
+            if(exact) { selectItem(exact); return; }
+
+            const matches = inventory.filter(i => i.name.toLowerCase().includes(val) || (i.barcode && i.barcode.includes(val))).slice(0, 10);
+            
+            if(matches.length > 0) {
+                results.innerHTML = matches.map(i => `
+                    <div onclick='selectItemById("${i.id}")' class="p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-50">
+                        <div class="font-bold text-sm text-slate-700">${i.name}</div>
+                        <div class="text-xs text-slate-400">${i.barcode || 'No Code'} | Stock: ${i.stockQuantity}</div>
+                    </div>
+                `).join('') + `<div onclick="enableNewItemMode('${val}')" class="p-3 bg-orange-50 hover:bg-orange-100 cursor-pointer text-orange-700 font-bold text-xs text-center">+ Create New Item</div>`;
+                results.classList.remove('hidden');
+            } else {
+                results.innerHTML = `<div onclick="enableNewItemMode('${val}')" class="p-3 bg-orange-50 hover:bg-orange-100 cursor-pointer text-orange-700 font-bold text-xs text-center">Item not found. Create "${val}"?</div>`;
+                results.classList.remove('hidden');
+            }
+        };
+
+        window.selectItemById = (id) => selectItem(inventory.find(i => i.id === id));
+
+        function selectItem(item) {
+            selectedItem = item;
+            document.getElementById('search-results').classList.add('hidden');
+            document.getElementById('item-search').value = '';
+            
+            document.getElementById('new-item-form').classList.add('hidden');
+            document.getElementById('selected-item-display').classList.remove('hidden');
+            
+            document.getElementById('sel-name').textContent = item.name;
+            document.getElementById('sel-stock').textContent = item.stockQuantity;
+            document.getElementById('sel-old-cost').textContent = LKR.format(item.costPrice || 0);
+            document.getElementById('sel-id').value = item.id;
+
+            document.getElementById('inp-cost').value = item.costPrice || '';
+            document.getElementById('inp-market').value = item.marketPrice || '';
+            document.getElementById('inp-sale').value = item.ourPrice || '';
+            document.getElementById('inp-qty').focus();
+        }
+
+        window.enableNewItemMode = (term) => {
+            selectedItem = 'NEW';
+            document.getElementById('search-results').classList.add('hidden');
+            document.getElementById('item-search').value = '';
+            document.getElementById('selected-item-display').classList.add('hidden');
+            document.getElementById('new-item-form').classList.remove('hidden');
+            document.getElementById('new-item-name').value = term || '';
+            document.getElementById('new-item-name').focus();
+        };
+
+        window.cancelNewItem = () => {
+            selectedItem = null;
+            document.getElementById('new-item-form').classList.add('hidden');
+        };
+
+        window.addToGRN = () => {
+            if(!selectedItem) return alert("Please select or create an item first.");
+            const cost = parseFloat(document.getElementById('inp-cost').value) || 0;
+            const market = parseFloat(document.getElementById('inp-market').value) || 0;
+            const sale = parseFloat(document.getElementById('inp-sale').value) || 0;
+            const qty = parseFloat(document.getElementById('inp-qty').value) || 0;
+
+            if(qty <= 0) return alert("Invalid Quantity");
+            if(cost <= 0 || sale <= 0) return alert("Cost and Sale Price are required");
+
+            let itemData = {};
+            if(selectedItem === 'NEW') {
+                const name = document.getElementById('new-item-name').value;
+                if(!name) return alert("Item Name Required");
+                itemData = {
+                    type: 'NEW',
+                    id: 'TEMP_' + Date.now(),
+                    name: name,
+                    barcode: document.getElementById('new-item-barcode').value,
+                    unit: document.getElementById('new-item-unit').value,
+                    stockQuantity: 0
+                };
+            } else {
+                itemData = { ...selectedItem, type: 'EXISTING' };
+            }
+
+            grnItems.push({
+                ...itemData,
+                newCost: cost, newMarket: market, newSale: sale, addQty: qty,
+                lineTotal: cost * qty
+            });
+
+            renderGRN();
+            
+            selectedItem = null;
+            document.getElementById('new-item-form').classList.add('hidden');
+            document.getElementById('selected-item-display').classList.add('hidden');
+            ['inp-cost', 'inp-market', 'inp-sale', 'inp-qty', 'new-item-name', 'new-item-barcode'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('item-search').focus();
+        };
+
+        function renderGRN() {
+            const tbody = document.getElementById('grn-body');
+            tbody.innerHTML = '';
+            let total = 0;
+            if(grnItems.length === 0) document.getElementById('empty-state').classList.remove('hidden');
+            else {
+                document.getElementById('empty-state').classList.add('hidden');
+                grnItems.forEach((item, idx) => {
+                    total += item.lineTotal;
+                    tbody.innerHTML += `
+                        <tr class="border-b border-slate-50 group hover:bg-slate-50">
+                            <td class="p-4 pl-6"><div class="font-bold text-slate-800">${item.name}</div><div class="text-xs text-slate-400">${item.barcode || ''} ${item.type === 'NEW' ? '<span class="text-orange-500 bg-orange-50 px-1 rounded ml-1">NEW</span>' : ''}</div></td>
+                            <td class="p-4 text-right text-slate-600">${item.newCost.toFixed(2)}</td>
+                            <td class="p-4 text-center font-bold">${item.addQty}</td>
+                            <td class="p-4 text-right font-bold text-slate-800">${item.lineTotal.toFixed(2)}</td>
+                            <td class="p-4 text-right text-cyan-600">${item.newSale.toFixed(2)}</td>
+                            <td class="p-4 pr-6 text-center"><button onclick="removeFromGRN(${idx})" class="text-red-400 hover:text-red-600 p-2 rounded hover:bg-red-50"><i class="ph ph-trash text-lg"></i></button></td>
+                        </tr>`;
+                });
+            }
+            document.getElementById('total-amount').textContent = LKR.format(total);
+            document.getElementById('item-count').textContent = `${grnItems.length} Items`;
+        }
+
+        window.removeFromGRN = (idx) => { grnItems.splice(idx, 1); renderGRN(); };
+
+        window.saveGRN = async () => {
+            if(grnItems.length === 0) return alert("GRN is empty");
+            const supplierId = document.getElementById('supplier-select').value;
+            const refNo = document.getElementById('grn-ref').value;
+            if(!supplierId) return alert("Please select a Supplier");
+
+            document.getElementById('loading-overlay').classList.remove('hidden');
+            try {
+                const batch = writeBatch(db);
+                const processedItems = [];
+
+                for (const item of grnItems) {
+                    let itemRef, newStock, newWacCost;
+                    if (item.type === 'NEW') {
+                        const newDocRef = doc(collection(db, "inventory"));
+                        itemRef = newDocRef;
+                        newStock = item.addQty;
+                        newWacCost = item.newCost;
+                        batch.set(newDocRef, {
+                            name: item.name, barcode: item.barcode, unit: item.unit,
+                            costPrice: item.newCost, marketPrice: item.newMarket, ourPrice: item.newSale,
+                            stockQuantity: item.addQty, minStock: 5, createdAt: new Date().toISOString()
+                        });
+                        item.id = newDocRef.id;
+                    } else {
+                        itemRef = doc(db, "inventory", item.id);
+                        const currentStock = item.stockQuantity || 0;
+                        const currentCost = item.costPrice || 0;
+                        const totalValue = (currentStock * currentCost) + (item.addQty * item.newCost);
+                        const totalQty = currentStock + item.addQty;
+                        newStock = totalQty;
+                        newWacCost = totalQty > 0 ? (totalValue / totalQty) : item.newCost;
+                        batch.update(itemRef, {
+                            stockQuantity: newStock, costPrice: newWacCost,
+                            marketPrice: item.newMarket, ourPrice: item.newSale, lastGrnDate: new Date().toISOString()
+                        });
+                    }
+                    processedItems.push({ itemId: item.id, name: item.name, qty: item.addQty, cost: item.newCost, total: item.lineTotal });
+                }
+
+                const grnRef = doc(collection(db, "purchases"));
+                const totalCost = grnItems.reduce((sum, i) => sum + i.lineTotal, 0);
+                batch.set(grnRef, {
+                    date: new Date().toISOString(), supplierId: supplierId, refNo: refNo,
+                    items: processedItems, totalCost: totalCost, user: auth.currentUser.email || 'Admin'
+                });
+
+                await batch.commit();
+                alert("GRN Saved Successfully!");
+                location.reload();
+            } catch(e) {
+                console.error(e);
+                alert("Error saving GRN: " + e.message);
+                document.getElementById('loading-overlay').classList.add('hidden');
+            }
+        };
+
+        // --- REPORTS & HISTORY ---
+        window.openReportsModal = () => document.getElementById('reports-modal').classList.remove('hidden');
+        window.closeReportsModal = () => document.getElementById('reports-modal').classList.add('hidden');
+        
+        window.openHistoryModal = async () => {
+            document.getElementById('history-modal').classList.remove('hidden');
+            try {
+                // Simplified query without orderBy to prevent index errors initially
+                const q = query(collection(db, "purchases"), limit(20)); 
+                const snap = await getDocs(q);
+                const tbody = document.getElementById('history-list');
+                tbody.innerHTML = '';
+                
+                const docs = snap.docs.map(d => d.data());
+                // Sort client side to avoid index requirement
+                docs.sort((a,b) => new Date(b.date) - new Date(a.date));
+
+                docs.forEach(data => {
+                    const sup = suppliers.find(s => s.id === data.supplierId)?.name || 'Unknown';
+                    const date = new Date(data.date).toLocaleDateString();
+                    tbody.innerHTML += `
+                        <tr class="border-b border-slate-50">
+                            <td class="py-3">${date}</td>
+                            <td class="py-3 text-slate-600 font-medium">${sup} <span class="text-xs text-slate-400 block">${data.refNo || ''}</span></td>
+                            <td class="py-3 text-right">${data.items.length}</td>
+                            <td class="py-3 text-right font-bold text-slate-700">${LKR.format(data.totalCost)}</td>
+                        </tr>
+                    `;
+                });
+            } catch(e) {
+                console.error("History Load Error", e);
+                // Fallback for empty or error
+                document.getElementById('history-list').innerHTML = `<tr><td colspan="4" class="text-center p-4 text-slate-400">No History Loaded</td></tr>`;
+            }
+        };
+        window.closeHistoryModal = () => document.getElementById('history-modal').classList.add('hidden');
+
+        window.generateReport = async () => {
+            const type = document.getElementById('report-type').value;
+            const lang = document.getElementById('report-lang').value;
+            const startVal = document.getElementById('rep-start').value;
+            const endVal = document.getElementById('rep-end').value;
+
+            if (!startVal || !endVal) {
+                return alert("Please select both start and end dates.");
+            }
+
+            const start = startVal;
+            const end = endVal + 'T23:59:59';
+
+            document.getElementById('loading-overlay').classList.remove('hidden'); 
+            document.querySelector('#loading-overlay p').textContent = "Generating Report...";
+
+            try {
+                // Using Firestore query
+                const q = query(
+                    collection(db, "purchases"), 
+                    where("date", ">=", start), 
+                    where("date", "<=", end)
+                );
+                
+                const snap = await getDocs(q);
+                const docs = snap.docs.map(d => d.data());
+
+                if (docs.length === 0) {
+                    document.getElementById('loading-overlay').classList.add('hidden');
+                    return alert("No records found for the selected date range.");
+                }
+                
+                // Sort by date descending (client side sort for report)
+                docs.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+
+                // --- FONT SUPPORT (ALWAYS LOAD FOR DATA) ---
+                // Fetch font file as ArrayBuffer
+                const fontUrl = 'https://fonts.gstatic.com/s/notosanssinhala/v30/nKvQc5sE8zUmzN8oJdO2l1E5.ttf';
+                const fontBytes = await fetch(fontUrl).then(res => res.arrayBuffer());
+                
+                // Add font to VFS and Register
+                const filename = 'NotoSansSinhala-Regular.ttf';
+                doc.addFileToVFS(filename, new Uint8Array(fontBytes));
+                doc.addFont(filename, 'NotoSansSinhala', 'normal');
+                
+                // Set font. If Lang is Sinhala, we prefer it. Even for English, we use it to support mixed data.
+                doc.setFont('NotoSansSinhala');
+
+                // --- HEADERS ---
+                const translations = {
+                    en: {
+                        title: "Purchase Report",
+                        period: "Period",
+                        headers: {
+                           summary: ['Date', 'Ref', 'Supplier', 'Items', 'Total'],
+                           itemwise: ['Date', 'Item Name', 'Qty', 'Cost', 'Total'],
+                           supplierwise: ['Supplier', 'Total Purchased']
+                        }
+                    },
+                    si: {
+                        title: "මිලදී ගැනීම් වාර්තාව",
+                        period: "කාල සීමාව",
+                        headers: {
+                           summary: ['දිනය', 'Ref', 'සැපයුම්කරු', 'අයිතම', 'එකතුව'],
+                           itemwise: ['දිනය', 'භාණ්ඩය', 'ප්‍රම.', 'මිල', 'එකතුව'],
+                           supplierwise: ['සැපයුම්කරු', 'මුළු මිලදී ගැනීම්']
+                        }
+                    }
+                };
+
+                const t = translations[lang];
+                
+                doc.text(t.title + ": " + type.toUpperCase(), 14, 20);
+                doc.setFontSize(10);
+                doc.text(`${t.period}: ${startVal} to ${endVal}`, 14, 26);
+                
+                let tableData = [];
+                let headers = [];
+
+                if (type === 'summary') {
+                    headers = [t.headers.summary];
+                    tableData = docs.map(d => [
+                        new Date(d.date).toLocaleDateString(),
+                        d.refNo || '-',
+                        suppliers.find(s => s.id === d.supplierId)?.name || 'Unknown',
+                        d.items.length,
+                        (d.totalCost || 0).toFixed(2)
+                    ]);
+                } else if (type === 'itemwise') {
+                    headers = [t.headers.itemwise];
+                    docs.forEach(d => {
+                        d.items.forEach(i => {
+                            tableData.push([
+                                new Date(d.date).toLocaleDateString(),
+                                i.name,
+                                i.qty,
+                                (i.cost || 0).toFixed(2),
+                                (i.total || 0).toFixed(2)
+                            ]);
+                        });
+                    });
+                } else {
+                    // Supplier Wise
+                    const supMap = {};
+                    docs.forEach(d => {
+                        const sName = suppliers.find(s => s.id === d.supplierId)?.name || 'Unknown';
+                        if(!supMap[sName]) supMap[sName] = 0;
+                        supMap[sName] += (d.totalCost || 0);
+                    });
+                    headers = [t.headers.supplierwise];
+                    tableData = Object.keys(supMap).map(k => [k, (supMap[k] || 0).toFixed(2)]);
+                }
+
+                doc.autoTable({
+                    startY: 35,
+                    head: headers,
+                    body: tableData,
+                    theme: 'grid',
+                    headStyles: { fillColor: [8, 145, 178] },
+                    styles: { 
+                        font: 'NotoSansSinhala',
+                        fontStyle: 'normal'
+                    }
+                });
+                
+                doc.save(`Purchase_Report_${type}_${startVal}_to_${endVal}.pdf`);
+                document.getElementById('loading-overlay').classList.add('hidden');
+                closeReportsModal();
+
+            } catch (e) {
+                console.error("Report Error:", e);
+                alert("Failed to generate report: " + e.message);
+                document.getElementById('loading-overlay').classList.add('hidden');
+            }
+        };
+
+    </script>
+</body>
+</html>
