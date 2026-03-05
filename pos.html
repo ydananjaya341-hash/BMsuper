@@ -10,9 +10,7 @@
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <!-- Google Font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- PDF & Scanner Libraries -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- Scanner Library -->
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
     <style>
@@ -23,16 +21,42 @@
         #reader video { object-fit: cover; border-radius: 0.75rem; }
 
         /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         
-        /* Receipt Print Area (Hidden) */
+        /* Receipt Print Area (Hidden on screen) */
         #receipt-print-area {
             position: fixed; top: -9999px; left: 0; z-index: -100;
             width: 58mm; background: white; color: black; padding: 0; margin: 0;
             font-family: 'Inter', sans-serif; 
+        }
+
+        /* 🖨️ Thermal Print Formatting */
+        @media print {
+            @page { 
+                margin: 0; 
+                size: 58mm auto; 
+            }
+            body { 
+                margin: 0 !important; 
+                background: white !important; 
+                -webkit-print-color-adjust: exact;
+            }
+            /* Hide the entire app UI */
+            body > *:not(#receipt-print-area) {
+                display: none !important;
+            }
+            /* Show ONLY the receipt formatted for thermal printers */
+            #receipt-print-area {
+                display: block !important;
+                position: static !important;
+                width: 58mm !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                z-index: 99999 !important;
+            }
         }
 
         .fade-in { animation: fadeIn 0.3s ease-out forwards; }
@@ -58,7 +82,7 @@
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
 
-    <!-- === INITIAL SYSTEM LOADER (Prevents Login Flash) === -->
+    <!-- === INITIAL SYSTEM LOADER === -->
     <div id="initial-loader" class="fixed inset-0 z-[100] bg-slate-50 flex flex-col items-center justify-center">
         <div class="w-16 h-16 bg-indigo-600 text-white rounded-2xl flex items-center justify-center text-3xl shadow-lg mb-4 animate-bounce">
             <i class="ph ph-shopping-cart"></i>
@@ -130,10 +154,10 @@
         </div>
         <div class="flex gap-2 items-center">
             <!-- Back to Dashboard Link -->
-            <a href="index.html" class="hidden sm:flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition mr-2 no-underline">
+            <a href="https://bmsuperdashboard.netlify.app/" class="hidden sm:flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition mr-2 no-underline">
                 <i class="ph ph-arrow-left"></i> Dashboard
             </a>
-            <a href="index.html" class="sm:hidden p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition mr-1" title="Back to Dashboard">
+            <a href="https://bmsuperdashboard.netlify.app/" class="sm:hidden p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition mr-1" title="Back to Dashboard">
                 <i class="ph ph-arrow-left text-xl"></i>
             </a>
 
@@ -160,14 +184,14 @@
                     </button>
                 </div>
                 
-                <!-- Camera View (Toggleable) -->
+                <!-- Camera View -->
                 <div id="camera-scanner-container" class="hidden bg-black w-full relative border-t border-slate-800">
                     <div id="reader" class="w-full h-64 sm:h-72 mx-auto"></div>
                     <button onclick="toggleCamera()" class="absolute top-2 right-2 bg-white/20 hover:bg-white/40 text-white p-2 rounded-full backdrop-blur-sm transition"><i class="ph ph-x text-lg"></i></button>
                 </div>
             </div>
 
-            <!-- 2. Staging Area (Selection) -->
+            <!-- 2. Staging Area -->
             <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                 <div class="relative w-full z-20 mb-4">
                     <input type="text" id="item-selector-input" oninput="handleSearch(this.value)" onkeydown="handleSearchKeydown(event)"
@@ -186,19 +210,15 @@
                         </div>
                     </div>
 
-                    <!-- Price Grid -->
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <!-- Cost -->
                         <div class="bg-white p-3 rounded-lg border border-slate-200">
                             <span class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Cost (WAC)</span>
                             <span id="pos-cost-display" class="font-bold text-slate-600 text-sm">LKR 0.00</span>
                         </div>
-                        <!-- Market -->
                         <div class="bg-white p-3 rounded-lg border border-slate-200">
                             <span class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Market</span>
                             <span id="pos-market-display" class="font-bold text-slate-400 text-sm line-through">LKR 0.00</span>
                         </div>
-                        <!-- Sale (Editable) -->
                         <div class="bg-indigo-50 p-3 rounded-lg border border-indigo-200 ring-1 ring-indigo-100 focus-within:ring-indigo-300 transition">
                             <span class="text-[10px] font-bold text-indigo-500 uppercase block mb-1">Sale Price</span>
                             <div class="flex items-center">
@@ -209,7 +229,7 @@
                     </div>
                 </div>
 
-                <!-- QTY & ADD ACTIONS -->
+                <!-- QTY & ADD -->
                 <div class="flex gap-3">
                     <div class="flex items-center bg-slate-100 border border-slate-200 rounded-xl px-2 w-1/3 sm:w-auto">
                         <button onclick="adjustQty(-1)" class="w-10 h-full text-slate-500 hover:text-slate-700 font-bold text-xl flex items-center justify-center active:scale-90 transition">-</button>
@@ -249,10 +269,10 @@
             </div>
         </div>
 
-        <!-- RIGHT COLUMN: Checkout Panel -->
-        <div class="w-full lg:w-[400px] bg-white rounded-2xl shadow-xl border border-slate-200 lg:sticky lg:top-4 overflow-hidden flex flex-col shrink-0">
+        <!-- RIGHT COLUMN: Checkout Panel (FIXED SCROLLING & MAX HEIGHT) -->
+        <div class="w-full lg:w-[400px] bg-white rounded-2xl shadow-xl border border-slate-200 lg:sticky lg:top-[88px] lg:max-h-[calc(100vh-110px)] overflow-hidden flex flex-col shrink-0">
             
-            <div class="p-6 bg-white border-b border-slate-100">
+            <div class="p-6 bg-white border-b border-slate-100 shrink-0">
                 <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2">
                     <i class="ph ph-credit-card text-indigo-600 text-xl"></i> Checkout
                 </h2>
@@ -260,7 +280,6 @@
             
             <div class="p-6 flex-1 overflow-y-auto custom-scroll space-y-6">
                 
-                <!-- Customer Search (Always Visible) -->
                 <div>
                     <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Customer (Optional)</label>
                     <div class="relative">
@@ -271,7 +290,6 @@
                     </div>
                 </div>
 
-                <!-- Payment Method & Discount -->
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Method</label>
@@ -289,7 +307,6 @@
                     </div>
                 </div>
 
-                <!-- Totals Display -->
                 <div class="space-y-2 py-4 border-t border-b border-slate-100">
                      <div class="flex justify-between items-center text-slate-500 text-sm">
                          <span class="font-medium">Subtotal</span>
@@ -301,7 +318,6 @@
                     </div>
                 </div>
 
-                <!-- Cash Received -->
                 <div>
                     <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Cash Received</label>
                     <div class="relative">
@@ -310,26 +326,23 @@
                     </div>
                 </div>
 
-                <!-- Balance Display -->
                 <div class="bg-indigo-50 rounded-xl p-5 border border-indigo-100">
                     <label class="block text-[10px] font-bold text-indigo-400 uppercase mb-1">Balance</label>
                     <div id="display-balance" class="text-3xl font-extrabold text-indigo-600 tracking-tight">-0.00</div>
                 </div>
                 
-                <!-- Auto PDF Badge -->
                 <div class="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50/50">
                     <div class="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-sm">
-                        <i class="ph ph-file-pdf text-lg"></i>
+                        <i class="ph ph-printer text-lg"></i>
                     </div>
                     <div>
-                        <p class="text-xs font-bold text-slate-700">Auto PDF (58mm)</p>
-                        <p class="text-[10px] text-slate-400">Thermal Printer Format</p>
+                        <p class="text-xs font-bold text-slate-700">Auto Print (58mm)</p>
+                        <p class="text-[10px] text-slate-400">Direct to Thermal Printer</p>
                     </div>
                 </div>
             </div>
 
-            <!-- Action Buttons -->
-            <div class="p-5 bg-white border-t border-slate-200 z-40 grid grid-cols-4 gap-3">
+            <div class="p-5 bg-white border-t border-slate-200 z-40 grid grid-cols-4 gap-3 shrink-0">
                 <button onclick="previewBill(false)" class="col-span-1 bg-white hover:bg-slate-50 text-slate-600 rounded-xl font-bold flex flex-col items-center justify-center p-2 transition border border-slate-200 shadow-sm">
                     <i class="ph ph-eye text-2xl mb-1"></i>
                     <span class="text-[10px] uppercase">Preview</span>
@@ -366,28 +379,28 @@
         </div>
     </div>
 
-    <!-- === BILL PREVIEW / SUCCESS MODAL === -->
-    <div id="preview-modal" class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm hidden fade-in">
-        <div class="flex flex-col items-center gap-4 w-full max-w-sm px-4">
+    <!-- === BILL PREVIEW / SUCCESS MODAL (FIXED SCROLLING) === -->
+    <div id="preview-modal" class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm hidden fade-in p-4 sm:p-6">
+        <div class="flex flex-col items-center gap-4 w-full max-w-sm max-h-[90vh]">
             
             <!-- Modal Title -->
-            <div id="preview-title-bar" class="w-full text-center text-white font-bold text-lg mb-2">Bill Preview</div>
+            <div id="preview-title-bar" class="w-full text-center text-white font-bold text-lg shrink-0">Bill Preview</div>
 
             <!-- Receipt Container -->
-            <div class="bg-white p-2 rounded shadow-2xl overflow-hidden w-full flex justify-center">
-                <div id="preview-content" class="bg-white text-black font-mono text-xs origin-top">
+            <div class="bg-white p-2 rounded shadow-2xl w-full flex-1 overflow-y-auto custom-scroll flex justify-center">
+                <div id="preview-content" class="bg-white text-black font-mono text-xs origin-top w-full">
                     <!-- Receipt Content Injected Here -->
                 </div>
             </div>
 
             <!-- Dynamic Buttons -->
-            <div id="modal-actions" class="flex gap-3 w-full">
+            <div id="modal-actions" class="flex gap-3 w-full shrink-0">
                 <!-- Buttons injected by JS -->
             </div>
         </div>
     </div>
 
-    <!-- === HIDDEN RECEIPT CONTAINER (For PDF Generation) === -->
+    <!-- === HIDDEN RECEIPT CONTAINER (For Direct Printing) === -->
     <div id="receipt-print-area"></div>
 
     <!-- === JAVASCRIPT LOGIC === -->
@@ -420,12 +433,10 @@
             signInWithPopup(auth, provider)
                 .then((result) => {
                     const user = result.user;
-                    // RESTRICT TO SPECIFIC EMAIL
                     if (user.email !== AUTHORIZED_ADMIN_EMAIL) {
                         signOut(auth);
                         showLoginError("Unauthorized Access. This Google account is not permitted.");
                     }
-                    // Else: onAuthStateChanged will handle the UI switch
                 })
                 .catch(err => showLoginError(err.message));
         };
@@ -459,13 +470,10 @@
             const loginOverlay = document.getElementById('login-overlay');
             const appInterface = document.getElementById('app-interface');
 
-            // Hide initial system loader once auth is determined
             if(loader) loader.classList.add('hidden');
 
             if (user) {
-                // If user logged in (and Google check passed during login phase)
                 if (user.providerData.some(p => p.providerId === 'google.com') && user.email !== AUTHORIZED_ADMIN_EMAIL) {
-                    // Double check in case of session persistence bypass
                     signOut(auth);
                     return; 
                 }
@@ -474,7 +482,6 @@
                 appInterface.classList.remove('hidden');
                 document.getElementById('cashier-name').textContent = user.displayName || user.email.split('@')[0];
                 initListeners();
-                // Slight delay to ensure DOM is ready before focus
                 setTimeout(() => {
                     const searchInput = document.getElementById('item-selector-input');
                     if(searchInput) searchInput.focus();
@@ -539,7 +546,7 @@
             if (event.key === "Enter") {
                  const resultsDiv = document.getElementById('search-results');
                  if(!resultsDiv.classList.contains('hidden') && resultsDiv.children.length > 0) {
-                     resultsDiv.children[0].click(); // Select first result
+                     resultsDiv.children[0].click(); 
                  }
             }
         };
@@ -561,9 +568,7 @@
             document.getElementById('pos-cost-display').textContent = LKR.format(item.costPrice || 0);
             document.getElementById('pos-market-display').textContent = LKR.format(item.marketPrice || item.ourPrice);
             
-            // Set Editable Sale Price
             document.getElementById('pos-price-input').value = item.ourPrice;
-            
             document.getElementById('item-quantity').value = 1;
             document.getElementById('item-quantity').focus();
             document.getElementById('item-quantity').select();
@@ -611,9 +616,8 @@
             val = val.trim(); if(!val) return;
             const item = inventory.find(i => i.barcode === val);
             if(item) {
-                // Auto add for barcode
                 stageItem(item);
-                setTimeout(addItemToBill, 200); // Small delay to visualize
+                setTimeout(addItemToBill, 200); 
                 const input = document.getElementById('barcode-input');
                 input.value = ''; input.focus(); 
             }
@@ -696,10 +700,8 @@
              let data;
              const totals = calculateTotals();
              
-             // Get Customer ID logic
              const custSearch = document.getElementById('bill-customer-search').value;
              let custId = null;
-             // Check if customer exists based on search string
              const exactCust = customers.find(c => `${c.name} - ${c.phone}` === custSearch);
              if(exactCust) custId = exactCust.id;
 
@@ -719,7 +721,6 @@
              const html = generateReceiptHTMLString(data, data.id);
              document.getElementById('preview-content').innerHTML = html;
              
-             // Setup Buttons for PREVIEW
              const actionsDiv = document.getElementById('modal-actions');
              if(!isPostSale) {
                  actionsDiv.innerHTML = `
@@ -768,7 +769,6 @@
             const totals = calculateTotals();
             const method = document.getElementById('payment-method').value;
             
-            // Robust Customer Search
             const custSearch = document.getElementById('bill-customer-search').value;
             let custId = null;
             if(custSearch) {
@@ -813,7 +813,7 @@
 
                 currentSaleId = saleRef.id;
 
-                // 2. Clear UI (Background)
+                // Clear UI
                 cart = [];
                 renderCart();
                 document.getElementById('cash-received').value = '';
@@ -822,21 +822,26 @@
                 document.getElementById('display-balance').textContent = "-0.00";
                 document.getElementById('bill-customer-search').value = '';
                 
-                // 3. Show Success/Print Modal
+                // Set HTML for Both Preview and Hidden Printer container
                 const html = generateReceiptHTMLString(saleData, currentSaleId);
-                
                 document.getElementById('receipt-print-area').innerHTML = html;
                 document.getElementById('preview-content').innerHTML = html;
                 
-                // Setup Buttons for POST-SALE
+                // Show Success Modal so user has a reprint button just in case
                 const actionsDiv = document.getElementById('modal-actions');
                 actionsDiv.innerHTML = `
                     <button onclick="finalPrintAndClose('${currentSaleId}')" class="flex-1 bg-emerald-500 text-white py-4 rounded-xl font-bold shadow-xl shadow-emerald-200 hover:bg-emerald-600 transition flex items-center justify-center gap-2 animate-bounce"><i class="ph ph-printer text-xl"></i> Print Receipt</button>
+                    <button onclick="closePreview()" class="py-4 px-6 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition">Close</button>
                 `;
                 
                 document.getElementById('preview-title-bar').innerText = "Transaction Saved!";
                 document.getElementById('loading-overlay').classList.add('hidden');
                 document.getElementById('preview-modal').classList.remove('hidden');
+
+                // 🔥 Trigger Browser Print Dialog IMMEDIATELY
+                setTimeout(() => {
+                    window.print();
+                }, 300);
 
             } catch (e) {
                 console.error(e);
@@ -846,7 +851,7 @@
         };
 
         window.finalPrintAndClose = async (id) => {
-            await printReceipt(id);
+            window.print(); // Direct to printer
             closePreview();
             document.getElementById('item-selector-input').focus();
         };
@@ -879,7 +884,7 @@
             totalSavings += (data.billDiscount || 0);
 
             return `
-                <div style="width: 58mm; padding: 5px; font-family: sans-serif; color: black; background:white;">
+                <div style="width: 58mm; padding: 5px; font-family: sans-serif; color: black; background:white; margin:0 auto;">
                     <div style="text-align: center; font-weight: bold; font-size: 16px;">BM SUPER</div>
                     <div style="text-align: center; font-size: 10px;">බී එම් සුපර් (ලාභ කඩේ)</div>
                     <div style="text-align: center; font-size: 10px;">අරුණපුර, තලාව.</div>
@@ -905,20 +910,7 @@
             `;
         }
 
-        async function printReceipt(id) {
-            const element = document.getElementById('receipt-print-area');
-            const canvas = await html2canvas(element, { scale: 2 });
-            const imgData = canvas.toDataURL('image/png');
-            const pdfWidth = 58;
-            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-            const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [pdfWidth, pdfHeight] });
-            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-            pdf.save(`Receipt_${id}.pdf`);
-        }
-
         window.toggleFullscreen = () => { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else if (document.exitFullscreen) document.exitFullscreen(); };
     </script>
 </body>
-
 </html>
